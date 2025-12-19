@@ -10,6 +10,7 @@ use CampaignBundle\Entity\Reward;
 use CampaignBundle\Enum\AwardType;
 use CreditBundle\Service\AccountService;
 use CreditBundle\Service\TransactionService;
+use Monolog\Attribute\WithMonologChannel;
 use Psr\Log\LoggerInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Uid\Uuid;
@@ -31,6 +32,7 @@ use Symfony\Component\Uid\Uuid;
  *
  * @see \CampaignBundle\Enum\AwardType::CREDIT
  */
+#[WithMonologChannel(channel: 'campaign_credit')]
 readonly class CreditRewardProcessor implements RewardProcessorInterface
 {
     public function __construct(

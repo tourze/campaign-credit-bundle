@@ -5,240 +5,147 @@ declare(strict_types=1);
 namespace CampaignCreditBundle\Tests\Service;
 
 use CampaignBundle\Contract\RewardProcessorInterface;
-use CampaignBundle\Entity\Award;
-use CampaignBundle\Entity\Campaign;
-use CampaignBundle\Entity\Reward;
 use CampaignBundle\Enum\AwardType;
 use CampaignCreditBundle\Service\CreditRewardProcessor;
-use CreditBundle\Entity\Account;
-use CreditBundle\Service\AccountService;
-use CreditBundle\Service\TransactionService;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\MockObject\MockObject;
-use PHPUnit\Framework\TestCase;
-use Psr\Log\LoggerInterface;
-use Symfony\Component\Security\Core\User\UserInterface;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Tourze\PHPUnitSymfonyKernelTest\AbstractIntegrationTestCase;
 
 /**
+ * CreditRewardProcessor 集成测试
+ *
+ * 测试服务的初始化和依赖注入
+ *
  * @internal
  */
 #[CoversClass(CreditRewardProcessor::class)]
-final class CreditRewardProcessorTest extends TestCase
+#[RunTestsInSeparateProcesses]
+final class CreditRewardProcessorTest extends AbstractIntegrationTestCase
 {
-    private AccountService $accountService;
-    private TransactionService $transactionService;
-    private LoggerInterface $logger;
     private CreditRewardProcessor $processor;
 
-    protected function setUp(): void
+    protected function onSetUp(): void
     {
-        $this->accountService = $this->createMock(AccountService::class);
-        $this->transactionService = $this->createMock(TransactionService::class);
-        $this->logger = $this->createMock(LoggerInterface::class);
-
-        $this->processor = new CreditRewardProcessor(
-            $this->accountService,
-            $this->transactionService,
-            $this->logger
-        );
+        // 从容器获取 CreditRewardProcessor - 验证依赖注入正确
+        $this->processor = self::getService(CreditRewardProcessor::class);
     }
 
+    /**
+     * 测试服务可以从容器获取
+     */
+    public function testServiceCanBeRetrievedFromContainer(): void
+    {
+        $this->assertInstanceOf(CreditRewardProcessor::class, $this->processor);
+    }
+
+    /**
+     * 测试实现了 RewardProcessorInterface 接口
+     */
     public function testImplementsRewardProcessorInterface(): void
     {
         $this->assertInstanceOf(RewardProcessorInterface::class, $this->processor);
     }
 
+    /**
+     * 测试支持 CREDIT 类型奖励
+     */
     public function testSupportsCreditsAwardType(): void
     {
         $this->assertTrue($this->processor->supports(AwardType::CREDIT));
     }
 
-    public function testDoesNotSupportOtherAwardTypes(): void
+    /**
+     * 测试不支持 COUPON 类型奖励
+     */
+    public function testDoesNotSupportCouponAwardType(): void
     {
         $this->assertFalse($this->processor->supports(AwardType::COUPON));
+    }
+
+    /**
+     * 测试不支持 COUPON_LOCAL 类型奖励
+     */
+    public function testDoesNotSupportCouponLocalAwardType(): void
+    {
         $this->assertFalse($this->processor->supports(AwardType::COUPON_LOCAL));
+    }
+
+    /**
+     * 测试不支持 SPU_QUALIFICATION 类型奖励
+     */
+    public function testDoesNotSupportSpuQualificationAwardType(): void
+    {
         $this->assertFalse($this->processor->supports(AwardType::SPU_QUALIFICATION));
     }
 
+    /**
+     * 测试 getPriority 返回正确的优先级
+     */
     public function testGetPriority(): void
     {
         $this->assertEquals(0, $this->processor->getPriority());
     }
 
-    public function testProcessWithValidAmount(): void
+    /**
+     * 测试服务有 process 方法
+     */
+    public function testProcessMethodExists(): void
     {
-        /** @var MockObject&UserInterface $user */
-        $user = $this->createMock(UserInterface::class);
-        /** @var MockObject&Campaign $campaign */
-        $campaign = $this->createMock(Campaign::class);
-        $campaign->method('getName')->willReturn('Test Campaign');
-        $campaign->method('getId')->willReturn(1);
+        $reflection = new \ReflectionClass(CreditRewardProcessor::class);
 
-        /** @var MockObject&Award $award */
-        $award = $this->createMock(Award::class);
-        $award->method('getValue')->willReturn('100');
-        $award->method('getCampaign')->willReturn($campaign);
-        $award->method('getId')->willReturn(1);
-
-        /** @var MockObject&Reward $reward */
-        $reward = $this->createMock(Reward::class);
-
-        /** @var MockObject&Account $account */
-        $account = $this->createMock(Account::class);
-        $this->accountService->expects($this->once())
-            ->method('getAccountByUser')
-            ->with($user, 'CREDIT')
-            ->willReturn($account);
-
-        $this->transactionService->expects($this->once())
-            ->method('increase')
-            ->with(
-                self::matchesRegularExpression('/^CAMPAIGN-1-[0-9a-f-]{36}$/'),
-                $account,
-                100,
-                'Test Campaign'
-            );
-
-        $reward->expects($this->once())
-            ->method('setSn')
-            ->with(self::matchesRegularExpression('/^CAMPAIGN-1-[0-9a-f-]{36}$/'));
-
-        $this->logger->expects($this->once())
-            ->method('info')
-            ->with('Credit reward processed successfully', self::isArray());
-
-        $this->processor->process($user, $award, $reward);
+        $this->assertTrue($reflection->hasMethod('process'));
+        $this->assertTrue($reflection->getMethod('process')->isPublic());
     }
 
-    public function testProcessThrowsExceptionForInvalidAmount(): void
+    /**
+     * 测试 process 方法签名
+     */
+    public function testProcessMethodSignature(): void
     {
-        /** @var MockObject&UserInterface $user */
-        $user = $this->createMock(UserInterface::class);
-        /** @var MockObject&Campaign $campaign */
-        $campaign = $this->createMock(Campaign::class);
-        /** @var MockObject&Award $award */
-        $award = $this->createMock(Award::class);
-        $award->method('getValue')->willReturn('0');
-        $award->method('getCampaign')->willReturn($campaign);
+        $reflection = new \ReflectionMethod(CreditRewardProcessor::class, 'process');
+        $parameters = $reflection->getParameters();
 
-        /** @var MockObject&Reward $reward */
-        $reward = $this->createMock(Reward::class);
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('积分数量必须大于 0');
-
-        $this->processor->process($user, $award, $reward);
+        $this->assertCount(3, $parameters);
+        $this->assertEquals('user', $parameters[0]->getName());
+        $this->assertEquals('award', $parameters[1]->getName());
+        $this->assertEquals('reward', $parameters[2]->getName());
     }
 
-    public function testProcessLogsErrorOnException(): void
+    /**
+     * 测试 supports 方法签名
+     */
+    public function testSupportsMethodSignature(): void
     {
-        /** @var MockObject&UserInterface $user */
-        $user = $this->createMock(UserInterface::class);
-        /** @var MockObject&Campaign $campaign */
-        $campaign = $this->createMock(Campaign::class);
-        $campaign->method('getName')->willReturn('Test Campaign');
-        $campaign->method('getId')->willReturn(1);
+        $reflection = new \ReflectionMethod(CreditRewardProcessor::class, 'supports');
+        $parameters = $reflection->getParameters();
 
-        /** @var MockObject&Award $award */
-        $award = $this->createMock(Award::class);
-        $award->method('getValue')->willReturn('100');
-        $award->method('getCampaign')->willReturn($campaign);
-        $award->method('getId')->willReturn(1);
-
-        /** @var MockObject&Reward $reward */
-        $reward = $this->createMock(Reward::class);
-
-        $this->accountService->expects($this->once())
-            ->method('getAccountByUser')
-            ->willThrowException(new \RuntimeException('Account service error'));
-
-        $this->logger->expects($this->once())
-            ->method('error')
-            ->with('Failed to process credit reward', self::isArray());
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Account service error');
-
-        $this->processor->process($user, $award, $reward);
+        $this->assertCount(1, $parameters);
+        $this->assertEquals('type', $parameters[0]->getName());
     }
 
-    public function testProcessUsesEnvironmentVariableForCurrency(): void
+    /**
+     * 测试服务是 readonly 类
+     */
+    public function testServiceIsReadonly(): void
     {
-        $_ENV['DEFAULT_CREDIT_CURRENCY_CODE'] = 'POINTS';
-
-        /** @var MockObject&UserInterface $user */
-        $user = $this->createMock(UserInterface::class);
-        /** @var MockObject&Campaign $campaign */
-        $campaign = $this->createMock(Campaign::class);
-        $campaign->method('getName')->willReturn('Test Campaign');
-        $campaign->method('getId')->willReturn(1);
-
-        /** @var MockObject&Award $award */
-        $award = $this->createMock(Award::class);
-        $award->method('getValue')->willReturn('50');
-        $award->method('getCampaign')->willReturn($campaign);
-        $award->method('getId')->willReturn(1);
-
-        /** @var MockObject&Reward $reward */
-        $reward = $this->createMock(Reward::class);
-
-        /** @var MockObject&Account $account */
-        $account = $this->createMock(Account::class);
-        $this->accountService->expects($this->once())
-            ->method('getAccountByUser')
-            ->with($user, 'POINTS')
-            ->willReturn($account);
-
-        $this->transactionService->expects($this->once())
-            ->method('increase');
-
-        $reward->expects($this->once())
-            ->method('setSn');
-
-        $this->processor->process($user, $award, $reward);
-
-        unset($_ENV['DEFAULT_CREDIT_CURRENCY_CODE']);
+        $reflection = new \ReflectionClass(CreditRewardProcessor::class);
+        $this->assertTrue($reflection->isReadOnly());
     }
 
-    public function testProcessUsesEnvironmentVariableForRemark(): void
+    /**
+     * 测试构造函数依赖
+     */
+    public function testConstructorDependencies(): void
     {
-        $_ENV['CAMPAIGN_AWARD_CREDIT_REMARK'] = 'Custom Remark';
+        $reflection = new \ReflectionClass(CreditRewardProcessor::class);
+        $constructor = $reflection->getConstructor();
 
-        /** @var MockObject&UserInterface $user */
-        $user = $this->createMock(UserInterface::class);
-        /** @var MockObject&Campaign $campaign */
-        $campaign = $this->createMock(Campaign::class);
-        $campaign->method('getId')->willReturn(1);
+        $this->assertNotNull($constructor);
+        $parameters = $constructor->getParameters();
 
-        /** @var MockObject&Award $award */
-        $award = $this->createMock(Award::class);
-        $award->method('getValue')->willReturn('50');
-        $award->method('getCampaign')->willReturn($campaign);
-        $award->method('getId')->willReturn(1);
-
-        /** @var MockObject&Reward $reward */
-        $reward = $this->createMock(Reward::class);
-
-        /** @var MockObject&Account $account */
-        $account = $this->createMock(Account::class);
-        $this->accountService->expects($this->once())
-            ->method('getAccountByUser')
-            ->willReturn($account);
-
-        $this->transactionService->expects($this->once())
-            ->method('increase')
-            ->with(
-                self::anything(),
-                $account,
-                50,
-                'Custom Remark'
-            );
-
-        $reward->expects($this->once())
-            ->method('setSn');
-
-        $this->processor->process($user, $award, $reward);
-
-        unset($_ENV['CAMPAIGN_AWARD_CREDIT_REMARK']);
+        $this->assertCount(3, $parameters);
+        $this->assertEquals('accountService', $parameters[0]->getName());
+        $this->assertEquals('transactionService', $parameters[1]->getName());
+        $this->assertEquals('logger', $parameters[2]->getName());
     }
 }

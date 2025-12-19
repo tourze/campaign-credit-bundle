@@ -6,27 +6,16 @@ namespace CampaignCreditBundle\Tests;
 
 use CampaignCreditBundle\CampaignCreditBundle;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\TestCase;
-use Tourze\BundleDependency\BundleDependencyInterface;
+use PHPUnit\Framework\Attributes\RunTestsInSeparateProcesses;
+use Tourze\PHPUnitSymfonyKernelTest\AbstractBundleTestCase;
 
 /**
+ * CampaignCreditBundle 测试
+ *
  * @internal
  */
 #[CoversClass(CampaignCreditBundle::class)]
-final class CampaignCreditBundleTest extends TestCase
+#[RunTestsInSeparateProcesses]
+final class CampaignCreditBundleTest extends AbstractBundleTestCase
 {
-    public function testImplementsBundleDependencyInterface(): void
-    {
-        $bundle = new CampaignCreditBundle();
-
-        $this->assertInstanceOf(BundleDependencyInterface::class, $bundle);
-    }
-
-    public function testBundleCanBeInstantiated(): void
-    {
-        $bundle = new CampaignCreditBundle();
-
-        $this->assertNotNull($bundle);
-        $this->assertInstanceOf(CampaignCreditBundle::class, $bundle);
-    }
 }
